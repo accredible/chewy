@@ -23,7 +23,7 @@ module Chewy
       since_time -= 1
       count = 0
 
-      total_count = entries(since_time, fetch_limit).total_count
+      total_count = entries(since_time, fetch_limit).count
 
       while count < total_count
         entries = entries(since_time, fetch_limit).to_a.presence or break
