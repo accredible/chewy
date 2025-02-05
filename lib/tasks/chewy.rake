@@ -57,6 +57,11 @@ namespace :chewy do
     Chewy::RakeHelper.update_mapping(name: args[:index_name])
   end
 
+  desc 'Creates missing indexes'
+  task create_missing_indexes: :environment do
+    Chewy::RakeHelper.create_missing_indexes!
+  end
+
   namespace :parallel do
     desc 'Parallel version of `rake chewy:reset`'
     task reset: :environment do |_task, args|
@@ -87,6 +92,11 @@ namespace :chewy do
   end
 
   namespace :journal do
+    desc 'Create manually journal, useful when `skip_journal_creation_on_import` is used'
+    task create: :environment do |_task, _args|
+      Chewy::RakeHelper.journal_create
+    end
+
     desc 'Applies changes that were done after the specified time for the specified indexes/types or all of them'
     task apply: :environment do |_task, args|
       Chewy::RakeHelper.journal_apply(**parse_journal_args(args.extras))
@@ -94,7 +104,13 @@ namespace :chewy do
 
     desc 'Removes journal records created before the specified timestamp for the specified indexes/types or all of them'
     task clean: :environment do |_task, args|
-      Chewy::RakeHelper.journal_clean(**parse_journal_args(args.extras))
+      delete_options = Chewy::RakeHelper.delete_by_query_options_from_env(ENV)
+      Chewy::RakeHelper.journal_clean(
+        **[
+          parse_journal_args(args.extras),
+          {delete_by_query_options: delete_options}
+        ].reduce({}, :merge)
+      )
     end
   end
 end

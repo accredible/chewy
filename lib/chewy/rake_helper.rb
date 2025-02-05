@@ -19,6 +19,9 @@ module Chewy
       output.puts "  Applying journal to #{targets}, #{count} entries, stage #{payload[:stage]}"
     end
 
+    DELETE_BY_QUERY_OPTIONS = %w[WAIT_FOR_COMPLETION REQUESTS_PER_SECOND SCROLL_SIZE].freeze
+    FALSE_VALUES = %w[0 f false off].freeze
+
     class << self
       # Performs zero-downtime reindexing of all documents for the specified indexes
       #
@@ -162,7 +165,7 @@ module Chewy
 
         subscribed_task_stats(output) do
           output.puts "Applying journal entries created after #{time}"
-          count = Chewy::Journal.new(indexes_from(only: only, except: except)).apply(time)
+          count = Chewy::Journal.new(journal_indexes_from(only: only, except: except)).apply(time)
           output.puts 'No journal entries were created after the specified time' if count.zero?
         end
       end
@@ -181,12 +184,29 @@ module Chewy
       # @param except [Array<Chewy::Index, String>, Chewy::Index, String] indexes to exclude from processing
       # @param output [IO] output io for logging
       # @return [Array<Chewy::Index>] indexes that were actually updated
-      def journal_clean(time: nil, only: nil, except: nil, output: $stdout)
+      def journal_clean(time: nil, only: nil, except: nil, delete_by_query_options: {}, output: $stdout)
         subscribed_task_stats(output) do
           output.puts "Cleaning journal entries created before #{time}" if time
-          response = Chewy::Journal.new(indexes_from(only: only, except: except)).clean(time)
-          count = response['deleted'] || response['_indices']['_all']['deleted']
-          output.puts "Cleaned up #{count} journal entries"
+          response = Chewy::Journal.new(journal_indexes_from(only: only, except: except)).clean(time, delete_by_query_options: delete_by_query_options)
+          if response.key?('task')
+            output.puts "Task to cleanup the journal has been created, #{response['task']}"
+          else
+            count = response['deleted'] || response['_indices']['_all']['deleted']
+            output.puts "Cleaned up #{count} journal entries"
+          end
+        end
+      end
+
+      # Creates journal index.
+      #
+      # @example
+      #   Chewy::RakeHelper.journal_create # creates journal
+      #
+      # @param output [IO] output io for logging
+      # @return Chewy::Index Returns instance of chewy index
+      def journal_create(output: $stdout)
+        subscribed_task_stats(output) do
+          Chewy::Stash::Journal.create!
         end
       end
 
@@ -228,6 +248,44 @@ module Chewy
         end
       end
 
+      # Reads options that are required to run journal cleanup asynchronously from ENV hash
+      # @see https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
+      #
+      # @example
+      #   Chewy::RakeHelper.delete_by_query_options_from_env({'WAIT_FOR_COMPLETION' => 'false','REQUESTS_PER_SECOND' => '10','SCROLL_SIZE' => '5000'})
+      #   # => { wait_for_completion: false, requests_per_second: 10.0, scroll_size: 5000 }
+      #
+      def delete_by_query_options_from_env(env)
+        env
+          .slice(*DELETE_BY_QUERY_OPTIONS)
+          .transform_keys { |k| k.downcase.to_sym }
+          .to_h do |key, value|
+            case key
+            when :wait_for_completion then [key, !FALSE_VALUES.include?(value.downcase)]
+            when :requests_per_second then [key, value.to_f]
+            when :scroll_size then [key, value.to_i]
+            end
+          end
+      end
+
+      def create_missing_indexes!(output: $stdout, env: ENV)
+        subscribed_task_stats(output) do
+          Chewy.eager_load!
+          all_indexes = Chewy::Index.descendants
+          all_indexes -= [Chewy::Stash::Journal] unless Chewy.configuration[:journal]
+          all_indexes.each do |index|
+            if index.exists?
+              output.puts "#{index.name} already exists, skipping" if env['VERBOSE']
+              next
+            end
+
+            index.create!
+
+            output.puts "#{index.name} index successfully created"
+          end
+        end
+      end
+
       def normalize_indexes(*identifiers)
         identifiers.flatten(1).map { |identifier| normalize_index(identifier) }
       end
@@ -243,10 +301,17 @@ module Chewy
         ActiveSupport::Notifications.subscribed(JOURNAL_CALLBACK.curry[output], 'apply_journal.chewy') do
           ActiveSupport::Notifications.subscribed(IMPORT_CALLBACK.curry[output], 'import_objects.chewy', &block)
         end
+      ensure
         output.puts "Total: #{human_duration(Time.now - start)}"
       end
 
     private
+
+      def journal_indexes_from(only: nil, except: nil)
+        return if Array.wrap(only).empty? && Array.wrap(except).empty?
+
+        indexes_from(only: only, except: except)
+      end
 
       def indexes_from(only: nil, except: nil)
         indexes = if only.present?
@@ -255,11 +320,7 @@ module Chewy
           all_indexes
         end
 
-        indexes = if except.present?
-          indexes - normalize_indexes(Array.wrap(except))
-        else
-          indexes
-        end
+        indexes -= normalize_indexes(Array.wrap(except)) if except.present?
 
         indexes.sort_by(&:derivable_name)
       end
@@ -282,9 +343,9 @@ module Chewy
         return if journal_exists?
 
         output.puts "############################################################\n" \
-                    "WARN: You are risking to lose some changes during the reset.\n" \
-                    "      Please consider enabling journaling.\n" \
-                    "      See https://github.com/toptal/chewy#journaling\n" \
+                    "WARN: You are risking to lose some changes during the reset.\n      " \
+                    "Please consider enabling journaling.\n      " \
+                    "See https://github.com/toptal/chewy#journaling\n" \
                     '############################################################'
       end
 

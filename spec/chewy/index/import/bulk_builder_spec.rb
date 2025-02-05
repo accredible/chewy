@@ -17,7 +17,7 @@ SimpleComment = Class.new do
 end
 
 describe Chewy::Index::Import::BulkBuilder do
-  before { Chewy.massacre }
+  before { drop_indices }
 
   subject { described_class.new(index, to_index: to_index, delete: delete, fields: fields) }
   let(:index) { CitiesIndex }
@@ -62,6 +62,8 @@ describe Chewy::Index::Import::BulkBuilder do
         let(:to_index) { cities.first(2) }
         let(:delete) { [cities.last] }
         specify do
+          expect(subject).to receive(:data_for).with(cities.first).and_call_original
+          expect(subject).to receive(:data_for).with(cities.second).and_call_original
           expect(subject.bulk_body).to eq([
             {index: {_id: 1, data: {'name' => 'City17', 'rating' => 42}}},
             {index: {_id: 2, data: {'name' => 'City18', 'rating' => 42}}},
@@ -72,6 +74,8 @@ describe Chewy::Index::Import::BulkBuilder do
         context ':fields' do
           let(:fields) { %w[name] }
           specify do
+            expect(subject).to receive(:data_for).with(cities.first, fields: [:name]).and_call_original
+            expect(subject).to receive(:data_for).with(cities.second, fields: [:name]).and_call_original
             expect(subject.bulk_body).to eq([
               {update: {_id: 1, data: {doc: {'name' => 'City17'}}}},
               {update: {_id: 2, data: {doc: {'name' => 'City18'}}}},
@@ -128,7 +132,7 @@ describe Chewy::Index::Import::BulkBuilder do
       before do
         stub_index(:cities) do
           crutch :names do |collection|
-            collection.map { |item| [item.id, "Name#{item.id}"] }.to_h
+            collection.to_h { |item| [item.id, "Name#{item.id}"] }
           end
 
           field :name, value: ->(o, c) { c.names[o.id] }
@@ -194,7 +198,7 @@ describe Chewy::Index::Import::BulkBuilder do
           index_scope Comment
 
           crutch :content_with_crutches do |collection| # collection here is a current batch of products
-            collection.map { |comment| [comment.id, "[crutches] #{comment.content}"] }.to_h
+            collection.to_h { |comment| [comment.id, "[crutches] #{comment.content}"] }
           end
 
           field :content
@@ -212,7 +216,7 @@ describe Chewy::Index::Import::BulkBuilder do
       end
 
       def do_raw_index_comment(options:, data:)
-        CommentsIndex.client.index(options.merge(index: 'comments', type: '_doc', refresh: true, body: data))
+        CommentsIndex.client.index(options.merge(index: 'comments', refresh: true, body: data))
       end
 
       def raw_index_comment(comment)
@@ -268,7 +272,7 @@ describe Chewy::Index::Import::BulkBuilder do
             default_import_options raw_import: ->(hash) { SimpleComment.new(hash) }
 
             crutch :content_with_crutches do |collection| # collection here is a current batch of products
-              collection.map { |comment| [comment.id, "[crutches] #{comment.content}"] }.to_h
+              collection.to_h { |comment| [comment.id, "[crutches] #{comment.content}"] }
             end
 
             field :content
