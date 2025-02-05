@@ -48,12 +48,11 @@ module Chewy
         def index_entry(object)
           entry = {}
           entry[:_id] = index_object_ids[object] if index_object_ids[object]
-
-          data = data_for(object)
-          parent = cache(entry[:_id])
-
           entry[:routing] = routing(object) if join_field?
-          if parent_changed?(data, parent)
+
+          parent = cache(entry[:_id])
+          data = data_for(object) if parent.present?
+          if parent.present? && parent_changed?(data, parent)
             reindex_entries(object, data) + reindex_descendants(object)
           elsif @fields.present?
             return [] unless entry[:_id]
@@ -61,7 +60,7 @@ module Chewy
             entry[:data] = {doc: data_for(object, fields: @fields)}
             [{update: entry}]
           else
-            entry[:data] = data
+            entry[:data] = data || data_for(object)
             [{index: entry}]
           end
         end
@@ -163,12 +162,12 @@ module Chewy
             .filter(ids: {values: ids_for_cache})
             .order('_doc')
             .pluck(:_id, :_routing, join_field)
-            .map do |id, routing, join|
+            .to_h do |id, routing, join|
               [
                 id,
                 {routing: routing, parent_id: join['parent']}
               ]
-            end.to_h
+            end
         end
 
         def existing_routing(id)

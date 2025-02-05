@@ -20,7 +20,7 @@ module Chewy
       UNDEFINED = Class.new.freeze
       EVERFIELDS = %w[_index _type _id _parent _routing].freeze
       DELEGATED_METHODS = %i[
-        query filter post_filter order reorder docvalue_fields
+        query filter post_filter knn order reorder docvalue_fields
         track_scores track_total_hits request_cache explain version profile
         search_type preference limit offset terminate_after
         timeout min_score source stored_fields search_after
@@ -41,12 +41,12 @@ module Chewy
       EXTRA_STORAGES = %i[aggs suggest].freeze
       # An array of storage names that are changing the returned hist collection in any way.
       WHERE_STORAGES = %i[
-        query filter post_filter none min_score rescore indices_boost collapse
+        query filter post_filter knn none min_score rescore indices_boost collapse
       ].freeze
 
       delegate :hits, :wrappers, :objects, :records, :documents,
                :object_hash, :record_hash, :document_hash,
-               :total, :max_score, :took, :timed_out?, to: :response
+               :total, :max_score, :took, :timed_out?, :terminated_early?, to: :response
       delegate :each, :size, :to_a, :[], to: :wrappers
       alias_method :to_ary, :to_a
       alias_method :total_count, :total
@@ -520,7 +520,18 @@ module Chewy
       #   @see https://www.elastic.co/guide/en/elasticsearch/reference/current/collapse-search-results.html
       #   @param value [Hash]
       #   @return [Chewy::Search::Request]
-      %i[request_cache search_type preference timeout limit offset terminate_after min_score ignore_unavailable collapse].each do |name|
+      #
+      # @!method knn(value)
+      #   Replaces the value of the `knn` request part.
+      #
+      #   @example
+      #     PlacesIndex.knn(field: :vector, query_vector: [4, 2], k: 5, num_candidates: 50)
+      #     # => <PlacesIndex::Query {..., :body=>{:knn=>{"field"=>:vector, "query_vector"=>[4, 2], "k"=>5, "num_candidates"=>50}}}>
+      #   @see Chewy::Search::Parameters::Knn
+      #   @see https://www.elastic.co/guide/en/elasticsearch/reference/current/knn-search.html
+      #   @param value [Hash]
+      #   @return [Chewy::Search::Request]
+      %i[request_cache search_type preference timeout limit offset terminate_after min_score ignore_unavailable collapse knn].each do |name|
         define_method name do |value|
           modify(name) { replace!(value) }
         end
@@ -843,7 +854,7 @@ module Chewy
         else
           Chewy.client.count(only(WHERE_STORAGES).render)['count']
         end
-      rescue Elasticsearch::Transport::Transport::Errors::NotFound
+      rescue Elastic::Transport::Transport::Errors::NotFound
         0
       end
 
@@ -880,7 +891,7 @@ module Chewy
       def first(limit = UNDEFINED)
         request_limit = limit == UNDEFINED ? 1 : limit
 
-        if performed? && (request_limit <= size || size == total)
+        if performed? && (terminated_early? || request_limit <= size || size == total)
           limit == UNDEFINED ? wrappers.first : wrappers.first(limit)
         else
           result = except(EXTRA_STORAGES).limit(request_limit).to_a
@@ -962,10 +973,22 @@ module Chewy
       #
       # @see https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete-by-query.html
       # @note The result hash is different for different API used.
-      # @param refresh [true, false] field names
+      # @param refresh [true, false] Refreshes all shards involved in the delete by query
+      # @param wait_for_completion [true, false] wait for request completion or run it asynchronously
+      #    and return task reference at `.tasks/task/${taskId}`.
+      # @param requests_per_second [Float] The throttle for this request in sub-requests per second
+      # @param scroll_size [Integer] Size of the scroll request that powers the operation
+
       # @return [Hash] the result of query execution
-      def delete_all(refresh: true)
-        request_body = only(WHERE_STORAGES).render.merge(refresh: refresh)
+      def delete_all(refresh: true, wait_for_completion: nil, requests_per_second: nil, scroll_size: nil)
+        request_body = only(WHERE_STORAGES).render.merge(
+          {
+            refresh: refresh,
+            wait_for_completion: wait_for_completion,
+            requests_per_second: requests_per_second,
+            scroll_size: scroll_size
+          }.compact
+        )
         ActiveSupport::Notifications.instrument 'delete_query.chewy', notification_payload(request: request_body) do
           request_body[:body] = {query: {match_all: {}}} if request_body[:body].empty?
           Chewy.client.delete_by_query(request_body)
@@ -1012,7 +1035,7 @@ module Chewy
         request_body = render.merge(additional)
         ActiveSupport::Notifications.instrument 'search_query.chewy', notification_payload(request: request_body) do
           Chewy.client.search(request_body)
-        rescue Elasticsearch::Transport::Transport::Errors::NotFound
+        rescue Elastic::Transport::Transport::Errors::NotFound
           {}
         end
       end

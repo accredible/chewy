@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 shared_examples :kaminari do |request_base_class|
-  before { Chewy.massacre }
+  before { drop_indices }
 
   before do
     stub_index(:products) do
@@ -24,7 +24,7 @@ shared_examples :kaminari do |request_base_class|
     let(:data) { Array.new(10) { |i| {id: i.next.to_s, name: "Name#{i.next}", age: 10 * i.next}.stringify_keys! } }
 
     before { ProductsIndex.import!(data.map { |h| double(h) }) }
-    before { allow(::Kaminari.config).to receive_messages(default_per_page: 3) }
+    before { allow(Kaminari.config).to receive_messages(default_per_page: 3) }
 
     describe '#per, #page' do
       specify { expect(search.map { |e| e.attributes.except(*except_fields) }).to match_array(data) }

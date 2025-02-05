@@ -8,6 +8,140 @@
 
 ### Bugs Fixed
 
+* [#964](https://github.com/toptal/chewy/pull/964): Fix `delayed_sidekiq` worker to handle UUID primary keys correctly.
+
+## 8.0.0-beta (2024-08-27)
+
+### New Features
+
+* [#962](https://github.com/toptal/chewy/pull/962): ElasticSearch v.8 support added
+
+* `delete_all_enabled` setting introduced to align Chewy.massacre with wildcard indices deletion disabled in ES 8 by default
+
+### Changes
+
+### Bugs Fixed
+
+## 7.6.0 (2024-05-03)
+
+### Changes
+
+* [#933](https://github.com/toptal/chewy/pull/933): Relax allowed `elasticsearch` dependency versions. ([@mjankowski][])
+
+### Bugs Fixed
+* [#937](https://github.com/toptal/chewy/pull/937): Fix for race condition while using the `delayed_sidekiq` strategy. Also, fix for Redis bloating in case of reindexing error ([@skcc321](https://github.com/skcc321))
+
+* [#947](https://github.com/toptal/chewy/pull/947): Fix intermittent time-based failure in delayed sidekiq spec. ([@mjankowski][])
+
+## 7.5.1 (2024-01-30)
+
+### New Features
+
+* [#925](https://github.com/toptal/chewy/pull/925): Add configuration option for default scope cleanup behavior. ([@barthez][])
+
+### Changes
+
+### Bugs Fixed
+
+## 7.5.0 (2024-01-15)
+
+### New Features
+
+* [#894](https://github.com/toptal/chewy/pull/894): Way of cleaning redis from artifacts left by `delayed_sidekiq` strategy which could potentially cause flaky tests. ([@Drowze](https://github.com/Drowze))
+* [#919](https://github.com/toptal/chewy/pull/919): Add pre-request filter ([@konalegi][https://github.com/konalegi])
+
+## 7.4.0 (2023-12-13)
+
+### New Features
+
+### Changes
+
+* [#911](https://github.com/toptal/chewy/pull/911): Remove ruby 2.x. ([@konalegi][https://github.com/konalegi])
+
+### Bugs Fixed
+
+## 7.3.6 (2023-12-13)
+
+### New Features
+
+* [#890](https://github.com/toptal/chewy/pull/890): Add the [`knn`](https://www.elastic.co/guide/en/elasticsearch/reference/current/knn-search.html) option to the request. ([@jkostolansky][])
+
+### Changes
+
+### Bugs Fixed
+
+## 7.3.5 (2023-12-06)
+
+### New Features
+
+* [#907](https://github.com/toptal/chewy/pull/907): Fix deprecation warning in LogSubscriber for Rails 7.1 ([@alejandroperea](https://github.com/alejandroperea))
+
+### Changes
+
+### Bugs Fixed
+
+## 7.3.4 (2023-08-29)
+
+### New Features
+
+* [#888](https://github.com/toptal/chewy/pull/892): Rake task to create missing indexes ([@konalegi](https://github.com/konalegi))
+
+### Changes
+
+### Bugs Fixed
+
+## 7.3.3 (2023-07-07)
+
+### New Features
+
+* [#888](https://github.com/toptal/chewy/pull/888/files): Skip journal creation on import ([@konalegi](https://github.com/konalegi))
+
+### Changes
+
+### Bugs Fixed
+
+## 7.3.2 (2023-04-20)
+
+### New Features
+
+### Changes
+
+### Bugs Fixed
+
+* [#861](https://github.com/toptal/chewy/pull/861): Fix bug in mock_elasticsearch_response_sources ([@lafeber](https://github.com/lafeber))
+
+## 7.3.1 (2023-04-20)
+
+### Bugs Fixed
+
+* [#874](https://github.com/toptal/chewy/pull/874): Fix `chewy:journal:clean` task for ruby 3.x. ([@muk-ai](https://github.com/muk-ai))
+* [#882](https://github.com/toptal/chewy/pull/882): Fix memory leak during `chewy:reset` for ruby 3.2 ([@konalegi](https://github.com/konalegi))
+
+## 7.3.0 (2023-04-03)
+
+### New Features
+
+* [#869](https://github.com/toptal/chewy/pull/869): New strategy - `delayed_sidekiq`. Allow passing `strategy: :delayed_sidekiq` option to `SomeIndex.import([1, ...], strategy: :delayed_sidekiq)`. The strategy is compatible with `update_fields` option as well. ([@skcc321][])
+* [#879](https://github.com/toptal/chewy/pull/879): Configure CI to check for ruby 3.2 compatibility. ([@konalegi][])
+
+### Changes
+
+### Bugs Fixed
+
+* [#856](https://github.com/toptal/chewy/pull/856): Fix return value of subscribed_task_stats used in rake tasks. ([@fabiormoura][])
+
+## 7.2.7 (2022-11-15)
+
+### New Features
+
+* [#857](https://github.com/toptal/chewy/pull/857): Allow passing `wait_for_completion`, `request_per_second` and `scroll_size` options to `chewy:journal:clean` rake task and `delete_all` query builder method. ([@konalegi][])([@barthez][])
+
+### Changes
+
+### Bugs Fixed
+
+* [#863](https://github.com/toptal/chewy/pull/863): Fix `crutches` call doesn't respect `update_fields` option. ([@skcc321][])
+
 ## 7.2.6 (2022-06-13)
 
 ### New Features

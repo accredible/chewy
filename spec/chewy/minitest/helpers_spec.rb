@@ -10,14 +10,14 @@ describe :minitest_helper do
     expect(haystack).to include(needle)
   end
 
-  include ::Chewy::Minitest::Helpers
+  include Chewy::Minitest::Helpers
 
   def assert_equal(expected, actual, message)
     raise message unless expected == actual
   end
 
   before do
-    Chewy.massacre
+    drop_indices
   end
 
   before do
@@ -32,14 +32,14 @@ describe :minitest_helper do
         {
           '_index' => 'dummies',
           '_type' => '_doc',
-          '_id' => '1',
+          '_id' => '2',
           '_score' => 3.14,
           '_source' => source
         }
       ]
     end
 
-    let(:source) { {'name' => 'some_name'} }
+    let(:source) { {'name' => 'some_name', id: '2'} }
     let(:sources) { [source] }
 
     context 'mocks by raw response' do

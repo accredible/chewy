@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 describe Chewy::Index::Import do
-  before { Chewy.massacre }
+  before { drop_indices }
 
   before do
     stub_model(:city)
@@ -58,6 +58,19 @@ describe Chewy::Index::Import do
         expect(CitiesIndex).not_to receive(:exists?)
         expect(CitiesIndex).not_to receive(:create!)
         CitiesIndex.import(dummy_city)
+      end
+    end
+
+    context 'skip journal creation on import' do
+      before do
+        Chewy::Stash::Journal.create!
+        Chewy.config.settings[:skip_journal_creation_on_import] = true
+      end
+      after { Chewy.config.settings[:skip_journal_creation_on_import] = nil }
+
+      specify do
+        expect(Chewy::Stash::Journal).not_to receive(:create!)
+        CitiesIndex.import(dummy_city, journal: true)
       end
     end
   end
@@ -191,10 +204,10 @@ describe Chewy::Index::Import do
           end
         end
 
-        let(:mapper_parsing_exception) do
+        let(:document_parsing_exception) do
           {
-            'type' => 'mapper_parsing_exception',
-            'reason' => 'object mapping for [name] tried to parse field [name] as object, but found a concrete value'
+            'type' => 'document_parsing_exception',
+            'reason' => '[1:9] object mapping for [name] tried to parse field [name] as object, but found a concrete value'
           }
         end
 
@@ -202,8 +215,8 @@ describe Chewy::Index::Import do
           payload = subscribe_notification
           import dummy_cities, batch_size: 2
           expect(payload).to eq(index: CitiesIndex,
-            errors: {index: {mapper_parsing_exception => %w[1 2 3]}},
-            import: {index: 3})
+                                errors: {index: {document_parsing_exception => %w[1 2 3]}},
+                                import: {index: 3})
         end
       end
     end
@@ -257,8 +270,8 @@ describe Chewy::Index::Import do
         expect(payload).to eq(
           errors: {
             index: {{
-              'type' => 'mapper_parsing_exception',
-              'reason' => 'object mapping for [object] tried to parse field [object] as object, but found a concrete value'
+              'type' => 'document_parsing_exception',
+              'reason' => '[1:27] object mapping for [object] tried to parse field [object] as object, but found a concrete value'
             } => %w[2 4]}
           },
           import: {index: 6},
@@ -280,8 +293,8 @@ describe Chewy::Index::Import do
         expect(payload).to eq(
           errors: {
             index: {{
-              'type' => 'mapper_parsing_exception',
-              'reason' => 'object mapping for [object] tried to parse field [object] as object, but found a concrete value'
+              'type' => 'document_parsing_exception',
+              'reason' => '[1:27] object mapping for [object] tried to parse field [object] as object, but found a concrete value'
             } => %w[2 4]}
           },
           import: {index: 6},
@@ -306,8 +319,8 @@ describe Chewy::Index::Import do
           expect(payload).to eq(
             errors: {
               index: {{
-                'type' => 'mapper_parsing_exception',
-                'reason' => 'object mapping for [object] tried to parse field [object] as object, but found a concrete value'
+                'type' => 'document_parsing_exception',
+                'reason' => '[1:27] object mapping for [object] tried to parse field [object] as object, but found a concrete value'
               } => %w[2 4]}
             },
             import: {index: 6},
@@ -370,8 +383,8 @@ describe Chewy::Index::Import do
 
           # Full match doesn't work here.
           expect(payload[:errors][:update].keys).to match([
-            hash_including('type' => 'document_missing_exception', 'reason' => '[_doc][1]: document missing'),
-            hash_including('type' => 'document_missing_exception', 'reason' => '[_doc][3]: document missing')
+            hash_including('type' => 'document_missing_exception', 'reason' => '[1]: document missing'),
+            hash_including('type' => 'document_missing_exception', 'reason' => '[3]: document missing')
           ])
           expect(payload[:errors][:update].values).to eq([['1'], ['3']])
           expect(imported_cities).to match_array([
@@ -418,8 +431,8 @@ describe Chewy::Index::Import do
           expect(payload).to eq(
             errors: {
               update: {{
-                'type' => 'mapper_parsing_exception',
-                'reason' => 'object mapping for [object] tried to parse field [object] as object, but found a concrete value'
+                'type' => 'document_parsing_exception',
+                'reason' => '[1:26] object mapping for [object] tried to parse field [object] as object, but found a concrete value'
               } => %w[2 4]}
             },
             import: {index: 6},
@@ -554,7 +567,7 @@ describe Chewy::Index::Import do
     before do
       stub_index(:cities) do
         crutch :names do |collection|
-          collection.map { |o| [o.name, "#{o.name}42"] }.to_h
+          collection.to_h { |o| [o.name, "#{o.name}42"] }
         end
         field :name, value: ->(o, c) { c.names[o.name] }
         field :rating

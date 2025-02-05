@@ -31,8 +31,8 @@ describe Chewy do
     end
   end
 
-  describe '.massacre' do
-    before { Chewy.massacre }
+  xdescribe '.massacre' do
+    before { drop_indices }
 
     before do
       allow(Chewy).to receive_messages(configuration: Chewy.configuration.merge(prefix: 'prefix1'))
@@ -40,7 +40,7 @@ describe Chewy do
       allow(Chewy).to receive_messages(configuration: Chewy.configuration.merge(prefix: 'prefix2'))
       stub_index(:developers).create!
 
-      Chewy.massacre
+      drop_indices
 
       allow(Chewy).to receive_messages(configuration: Chewy.configuration.merge(prefix: 'prefix1'))
     end
@@ -57,18 +57,21 @@ describe Chewy do
 
     before do
       Chewy.current[:chewy_client] = nil
-      allow(Chewy).to receive_messages(configuration: {transport_options: {proc: faraday_block}})
+    end
 
-      allow(::Elasticsearch::Client).to receive(:new).with(expected_client_config) do |*_args, &passed_block|
+    specify do
+      expect(Chewy).to receive_messages(configuration: {transport_options: {proc: faraday_block}})
+
+      expect(Elasticsearch::Client).to receive(:new).with(expected_client_config) do |*_args, &passed_block|
         # RSpec's `with(..., &block)` was used previously, but doesn't actually do
         # any verification of the passed block (even of its presence).
         expect(passed_block.source_location).to eq(faraday_block.source_location)
 
         mock_client
       end
-    end
 
-    its(:client) { is_expected.to eq(mock_client) }
+      expect(Chewy.client).to be_a(Chewy::ElasticClient)
+    end
 
     after { Chewy.current[:chewy_client] = initial_client }
   end
@@ -81,7 +84,8 @@ describe Chewy do
       # To avoid flaky issues when previous specs were run
       allow(Chewy::Index).to receive(:descendants).and_return([CitiesIndex, PlacesIndex])
 
-      Chewy.massacre
+      CitiesIndex.delete
+      PlacesIndex.delete
     end
 
     specify do
@@ -108,7 +112,7 @@ describe Chewy do
       expect(CitiesIndex.exists?).to eq true
       expect(PlacesIndex.exists?).to eq true
 
-      expect { Chewy.create_indices! }.to raise_error(Elasticsearch::Transport::Transport::Errors::BadRequest)
+      expect { Chewy.create_indices! }.to raise_error(Elastic::Transport::Transport::Errors::BadRequest)
     end
   end
 end

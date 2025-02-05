@@ -2,7 +2,7 @@ lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'chewy/version'
 
-Gem::Specification.new do |spec| # rubocop:disable Metrics/BlockLength
+Gem::Specification.new do |spec|
   spec.name          = 'chewy'
   spec.version       = Chewy::VERSION
   spec.authors       = ['Toptal, LLC', 'pyromaniac']
@@ -11,26 +11,14 @@ Gem::Specification.new do |spec| # rubocop:disable Metrics/BlockLength
   spec.description   = 'Chewy provides functionality for Elasticsearch index handling, documents import mappings and chainable query DSL'
   spec.homepage      = 'https://github.com/toptal/chewy'
   spec.license       = 'MIT'
+  spec.required_ruby_version = '~> 3.0'
 
   spec.files         = `git ls-files`.split($RS)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
-  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ['lib']
 
-  spec.add_development_dependency 'database_cleaner'
-  spec.add_development_dependency 'elasticsearch-extensions'
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'rspec', '>= 3.7.0'
-  spec.add_development_dependency 'rspec-collection_matchers'
-  spec.add_development_dependency 'rspec-its'
-  spec.add_development_dependency 'rubocop', '1.11'
-  spec.add_development_dependency 'sqlite3'
-  spec.add_development_dependency 'timecop'
-
-  spec.add_development_dependency 'method_source'
-  spec.add_development_dependency 'unparser'
-
-  spec.add_dependency 'activesupport', '>= 5.2'
-  spec.add_dependency 'elasticsearch', '>= 7.12.0', '< 7.14.0'
+  spec.add_dependency 'activesupport', '>= 6.1'
+  spec.add_dependency 'elasticsearch', '>= 8.14', '< 9.0'
   spec.add_dependency 'elasticsearch-dsl'
+  spec.metadata['rubygems_mfa_required'] = 'true'
 end
